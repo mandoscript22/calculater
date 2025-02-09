@@ -1,0 +1,212 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Currency Converter</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;600&display=swap');
+        
+        body {
+            font-family: 'Poppins', sans-serif;
+            text-align: center;
+            margin: 50px;
+            background: linear-gradient(135deg, #1e3c72, #2a5298, #00c6ff, #0072ff);
+            background-size: 300% 300%;
+            animation: backgroundAnimation 10s infinite alternate;
+        }
+        
+        @keyframes backgroundAnimation {
+            0% {
+                background-position: 0% 50%;
+            }
+            100% {
+                background-position: 100% 50%;
+            }
+        }
+
+        .currency-logos {
+            display: flex;
+            justify-content: center;
+            gap: 15px;
+            padding: 10px;
+            border: 3px solid white;
+            border-radius: 10px;
+            background: rgba(255, 255, 255, 0.2);
+            margin-bottom: 20px;
+        }
+        
+        .currency-logos img {
+            width: 50px;
+            height: 50px;
+            border-radius: 50%;
+            background: white;
+            padding: 5px;
+        }
+
+        .main-container {
+            display: flex;
+            justify-content: space-around;
+            align-items: center;
+            flex-wrap: wrap;
+        }
+
+        .container {
+            max-width: 400px;
+            padding: 20px;
+            border-radius: 12px;
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.3);
+            background: rgba(0, 0, 0, 0.6);
+            color: white;
+            backdrop-filter: blur(10px);
+        }
+        
+        h2 {
+            margin-bottom: 20px;
+            font-size: 26px;
+            font-weight: 600;
+        }
+        
+        input, select, button {
+            width: 100%;
+            padding: 12px;
+            margin: 10px 0;
+            border: none;
+            border-radius: 8px;
+            font-size: 16px;
+        }
+        
+        input, select {
+            background: rgba(255, 255, 255, 0.8);
+            color: black;
+        }
+        
+        button {
+            background: linear-gradient(135deg, #ff9800, #ff5722);
+            color: white;
+            font-weight: bold;
+            cursor: pointer;
+            transition: transform 0.2s ease, background 0.3s;
+        }
+        
+        button:hover {
+            background: linear-gradient(135deg, #ff5722, #e64a19);
+            transform: scale(1.05);
+        }
+        
+        .chart-container {
+            width: 500px;
+            background: rgba(0, 0, 0, 0.8);
+            padding: 10px;
+            border-radius: 8px;
+        }
+    </style>
+</head>
+<body>
+    <div class="currency-logos">
+        <img src="https://upload.wikimedia.org/wikipedia/commons/6/6e/Euro_symbol_black.svg" alt="Euro">
+        <img src="https://upload.wikimedia.org/wikipedia/commons/5/5f/US_Dollar_Symbol.svg" alt="USD">
+        <img src="https://upload.wikimedia.org/wikipedia/commons/f/fc/Indian_Rupee_symbol.svg" alt="INR">
+        <img src="https://upload.wikimedia.org/wikipedia/commons/3/39/British_Pound_symbol.svg" alt="GBP">
+        <img src="https://upload.wikimedia.org/wikipedia/commons/4/4e/Yen_symbol.svg" alt="JPY">
+    </div>
+
+    <div class="main-container">
+        <div class="container">
+            <h2>Currency Converter</h2>
+            <input type="number" id="amount" placeholder="Enter Amount">
+            <select id="fromCurrency"></select>
+            <select id="toCurrency"></select>
+            <button onclick="convertCurrency()">Convert</button>
+            <h3 id="result">Converted Amount: -</h3>
+        </div>
+        
+        <div class="chart-container">
+            <canvas id="currencyChart"></canvas>
+        </div>
+    </div>
+
+    <script>
+        let currencyChart;
+        
+        async function fetchLiveRates() {
+            try {
+                const response = await fetch('https://api.exchangerate-api.com/v4/latest/USD');
+                const data = await response.json();
+                window.exchangeRates = data.rates;
+                
+                let fromSelect = document.getElementById("fromCurrency");
+                let toSelect = document.getElementById("toCurrency");
+                fromSelect.innerHTML = toSelect.innerHTML = '';
+                
+                Object.keys(data.rates).forEach(currency => {
+                    let option = `<option value="${currency}">${currency}</option>`;
+                    fromSelect.innerHTML += option;
+                    toSelect.innerHTML += option;
+                });
+
+                updateChart(data.rates);
+            } catch (error) {
+                console.error("Failed to fetch live rates", error);
+            }
+        }
+
+        function updateChart(rates) {
+            const labels = Object.keys(rates).slice(0, 10); // Display top 10 currencies
+            const values = Object.values(rates).slice(0, 10);
+
+            const ctx = document.getElementById('currencyChart').getContext('2d');
+
+            if (currencyChart) {
+                currencyChart.destroy();
+            }
+
+            currencyChart = new Chart(ctx, {
+                type: 'bar',
+                data: {
+                    labels: labels,
+                    datasets: [{
+                        label: 'Exchange Rate (Base: USD)',
+                        data: values,
+                        backgroundColor: 'rgba(75, 192, 192, 0.2)',
+                        borderColor: 'rgba(75, 192, 192, 1)',
+                        borderWidth: 1
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    plugins: {
+                        legend: {
+                            display: true,
+                            position: 'top',
+                        }
+                    },
+                    scales: {
+                        y: {
+                            beginAtZero: true
+                        }
+                    }
+                }
+            });
+        }
+
+        async function convertCurrency() {
+            let amount = document.getElementById("amount").value;
+            let fromCurrency = document.getElementById("fromCurrency").value;
+            let toCurrency = document.getElementById("toCurrency").value;
+            
+            if (!window.exchangeRates) {
+                await fetchLiveRates();
+            }
+            
+            let rate = window.exchangeRates[toCurrency] / window.exchangeRates[fromCurrency];
+            let convertedAmount = (amount * rate).toFixed(2);
+            document.getElementById("result").innerText = `Converted Amount: ${convertedAmount} ${toCurrency}`;
+        }
+        
+        fetchLiveRates();
+        setInterval(fetchLiveRates, 60000);
+    </script>
+</body>
+</html>
